@@ -3,7 +3,7 @@
 # @author: Alexis de Lattre <alexis.delattre@akretion.com>
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 class ResCompany(models.Model):
@@ -25,3 +25,34 @@ class ResCompany(models.Model):
         store=True,
         readonly=False,
     )
+    # Backport of l10n_fr 16.0 (res.company), needed by the e-invoicing stack
+    is_france_country = fields.Boolean(
+        compute="_compute_is_france_country",
+        string="Is Part of DOM-TOM",
+    )
+
+    @api.depends("country_id")
+    def _compute_is_france_country(self):
+        fr_country_codes = self._get_france_country_codes()
+        for company in self:
+            company.is_france_country = company.country_id.code in fr_country_codes
+
+    @api.model
+    def _get_france_country_codes(self):
+        """Returns every country code that can be used to represent France"""
+        # These codes correspond to France and DOM-TOM.
+        return [
+            "FR",
+            "MF",
+            "MQ",
+            "NC",
+            "PF",
+            "RE",
+            "GF",
+            "GP",
+            "TF",
+            "BL",
+            "PM",
+            "YT",
+            "WF",
+        ]
