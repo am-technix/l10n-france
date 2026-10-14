@@ -2,8 +2,8 @@
 # @author: Alexis de Lattre <alexis.delattre@akretion.com>
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
-from stdnum.fr.siren import validate as siren_validate
-from stdnum.fr.siret import validate as siret_validate
+from stdnum.fr.siren import is_valid as siren_is_valid, to_tva
+from stdnum.fr.siret import is_valid as siret_is_valid
 
 from odoo import _, api, models
 
@@ -16,7 +16,7 @@ class BusinessDocumentImport(models.AbstractModel):
         rpo = self.env["res.partner"]
         if partner_dict.get("siret"):
             siret = partner_dict["siret"].replace(" ", "")
-            if siret_validate(siret):
+            if siret_is_valid(siret):
                 partner = rpo.search(
                     domain + [("siret", "=", siret)], order=order, limit=1
                 )
@@ -31,12 +31,24 @@ class BusinessDocumentImport(models.AbstractModel):
                 siren = str(partner_dict["siren"])
             else:
                 siren = partner_dict["siren"].replace(" ", "")
-            if siren_validate(siren):
+            if siren_is_valid(siren):
                 partner = rpo.search(
                     domain
                     + [
                         ("parent_id", "=", False),
                         ("siren", "=", siren),
+                    ],
+                    limit=1,
+                    order=order,
+                )
+                if partner:
+                    return partner
+                vat_from_siren = f"FR{to_tva(siren)}"
+                partner = rpo.search(
+                    domain
+                    + [
+                        ("parent_id", "=", False),
+                        ("vat", "=", vat_from_siren),
                     ],
                     limit=1,
                     order=order,
@@ -69,7 +81,7 @@ class BusinessDocumentImport(models.AbstractModel):
             siren = siret[:9]
         if company_dict.get("siren"):
             siren = company_dict["siren"].replace(" ", "")
-        if siren and siren_validate(siren):
+        if siren and siren_is_valid(siren):
             if company.siren:
                 if company.siren != siren:
                     raise self.user_error_wrap(
