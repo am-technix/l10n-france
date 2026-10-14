@@ -12,16 +12,23 @@ from odoo.tools import file_open
 logger = logging.getLogger(__name__)
 
 
+DATA_FILES = (
+    "l10n_fr_account_tax_unece/data/account_tax_template.xml",
+    "l10n_fr_account_tax_unece/data/account_tax_template_optional.xml",
+)
+
+
 def set_unece_on_taxes(cr, registry):
-    f = file_open("l10n_fr_account_tax_unece/data/account_tax_template.xml", "rb")
-    xml_root = etree.parse(f)
     data = {}
-    for record in xml_root.xpath("//record"):
-        xmlid = record.attrib["id"]
-        data[xmlid] = {}
-        for xfield in record.xpath("field"):
-            xfield_dict = xfield.attrib
-            data[xmlid][xfield_dict["name"]] = xfield_dict.get("ref")
+    for data_file in DATA_FILES:
+        with file_open(data_file, "rb") as f:
+            xml_root = etree.parse(f)
+        for record in xml_root.xpath("//record"):
+            xmlid = record.attrib["id"]
+            data[xmlid] = {}
+            for xfield in record.xpath("field"):
+                xfield_dict = xfield.attrib
+                data[xmlid][xfield_dict["name"]] = xfield_dict.get("ref")
     logger.debug("set_unece_on_taxes data=%s", data)
     with api.Environment.manage():
         env = api.Environment(cr, SUPERUSER_ID, {})
