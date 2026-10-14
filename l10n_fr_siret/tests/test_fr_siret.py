@@ -3,7 +3,7 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 
 
-from odoo.exceptions import ValidationError
+from odoo.exceptions import UserError, ValidationError
 from odoo.tests.common import TransactionCase
 
 
@@ -165,3 +165,52 @@ class TestL10nFrSiret(TransactionCase):
                 "vat": "FR86792377731",
             }
         )
+
+    def test_get_siren_siret_nic(self):
+        partner = self.env["res.partner"].create(
+            {
+                "name": "Akretion France",
+                "is_company": True,
+                "country_id": self.env.ref("base.fr").id,
+                "siret": "79237773100015",
+            }
+        )
+        contact = self.env["res.partner"].create(
+            {"name": "Contact", "parent_id": partner.id}
+        )
+        self.assertEqual(partner._get_siren(), "792377731")
+        self.assertEqual(partner._get_siret(), "79237773100015")
+        self.assertEqual(partner._get_nic(), "00015")
+        # The SIREN of a contact is the one of its parent
+        self.assertEqual(contact._get_siren(), "792377731")
+        # The SIREN is taken from the french VAT number when there is one
+        partner_vat = self.env["res.partner"].create(
+            {
+                "name": "VAT only",
+                "country_id": self.env.ref("base.fr").id,
+                "vat": "FR86792377731",
+            }
+        )
+        self.assertEqual(partner_vat._get_siren(), "792377731")
+        self.assertIsNone(partner_vat._get_siret())
+        self.assertIsNone(partner_vat._get_nic())
+        with self.assertRaises(UserError):
+            partner_vat._get_siret(raise_if_none=True)
+        with self.assertRaises(UserError):
+            partner_vat._get_nic(raise_if_none=True)
+        partner_none = self.env["res.partner"].create({"name": "No SIREN"})
+        self.assertIsNone(partner_none._get_siren())
+        with self.assertRaises(UserError):
+            partner_none._get_siren(raise_if_none=True)
+
+    def test_is_france_country(self):
+        partner = self.env["res.partner"].create(
+            {"name": "Réunion", "country_id": self.env.ref("base.re").id}
+        )
+        self.assertTrue(partner.is_france_country)
+        partner.country_id = self.env.ref("base.be")
+        self.assertFalse(partner.is_france_country)
+        company = self.env["res.company"].browse(self.company2_id)
+        self.assertTrue(company.is_france_country)
+        self.assertIn("FR", company._get_france_country_codes())
+
